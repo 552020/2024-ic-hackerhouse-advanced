@@ -2,22 +2,24 @@ from transformers import GPT2LMHeadModel, GPT2Tokenizer
 import torch
 import onnx
 import onnxruntime as ort
+import os
 
 # Load GPT-2 model and tokenizer
-model = GPT2LMHeadModel.from_pretrained('gpt2')
-tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+model = GPT2LMHeadModel.from_pretrained("gpt2")
+tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
 
 # Prepare inputs
 input_text = "Hello, how are you?"
-inputs = tokenizer(input_text, return_tensors='pt')
-input_ids = inputs['input_ids']
-attention_mask = inputs['attention_mask']
+inputs = tokenizer(input_text, return_tensors="pt")
+input_ids = inputs["input_ids"]
+attention_mask = inputs["attention_mask"]
 
 # Perform the initial model run
 outputs = model(input_ids, attention_mask=attention_mask)
 logits = outputs.logits
 
 print("Logits:", logits.shape)
+
 
 # Prepare model for export by creating a wrapper
 class GPT2Wrapper(torch.nn.Module):
@@ -29,6 +31,7 @@ class GPT2Wrapper(torch.nn.Module):
         outputs = self.model(input_ids, attention_mask=attention_mask)
         return torch.argmax(outputs.logits[:, -1, :], dim=-1, keepdim=True)
 
+
 # Initialize the wrapper
 wrapper = GPT2Wrapper(model)
 
@@ -36,7 +39,12 @@ wrapper = GPT2Wrapper(model)
 batch_size = 1
 seq_length = 6
 input_ids = torch.randint(0, 50257, (batch_size, seq_length))  # Example input_ids
-attention_mask = torch.ones((batch_size, seq_length), dtype=torch.int8)          # Example attention mask
+attention_mask = torch.ones(
+    (batch_size, seq_length), dtype=torch.int8
+)  # Example attention mask
+
+# Create the directory before export
+os.makedirs("onnx_model", exist_ok=True)
 
 # Trace and export the model to ONNX
 torch.onnx.export(
@@ -48,9 +56,9 @@ torch.onnx.export(
     dynamic_axes={
         "input_ids": {0: "batch_size", 1: "sequence"},
         "attention_mask": {0: "batch_size", 1: "sequence"},
-        "output_id": {0: "batch_size"}
+        "output_id": {0: "batch_size"},
     },
-    opset_version=11
+    opset_version=11,
 )
 
 # Verify the exported ONNX model
