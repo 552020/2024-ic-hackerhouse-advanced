@@ -53,44 +53,21 @@ fn generate_text(input_prompt: String, token_limit: u8) -> Result<String, String
         .map_err(|err| format!("Error decoding the model output: {}", err))
 }
 
-
-/// Runs the model on the given token_ids and returns generated tokens.
 pub fn create_tensor_and_run_model(max_tokens: u8, token_ids: Vec<i64>) -> Result<Vec<i64>, anyhow::Error> {
     MODEL.with(|model| {
-        let model = model.borrow();  // Borrow the contents of the RefCell
-        let model = model.as_ref().unwrap();  // Ensure the model is initialized
-
+        let model = model.borrow();  
+        let model = model.as_ref().unwrap();  
         let mut past_key_values_tensor = create_empty_past_key_values(24, 1, 12, 0, 64)?;
-        //let mut past_key_values_tensor = create_empty_past_key_values(0, 1, 0, 0, 0)?;
-
         let mut input_ids = token_ids;
         let mut attention_mask: Vec<i8> = vec![1; input_ids.len()];
         let mut output_ids: Vec<i64> = Vec::new();
 
         for _ in 0..max_tokens {
-            /*
-            ic_cdk::println!(
-                "Iteration: {}, Input IDs Length: {}, Attention Mask Length: {}",
-                j,
-                input_ids.len(),
-                attention_mask.len()
-            );
-            */
             let input_ids_tensor = create_tensor_i64(&input_ids)?;
             let attention_mask_tensor = create_tensor_i8(&attention_mask)?;
 
             let inputs: TVec<TValue> = tvec!(input_ids_tensor.into(), attention_mask_tensor.into(), past_key_values_tensor.clone().into());
-            /*
-            for (i, input) in inputs.iter().enumerate() {
-                ic_cdk::println!("Input {}: {:?}", i, input.shape());
-                ic_cdk::println!("Input {} DType: {:?}", i, input.datum_type());
-            }
-            */
             let outputs = model.run(inputs)?;
-
-            //let logits = outputs[0].to_array_view::<f32>()?;
-            //let next_token = argmax(logits)?;
-            // Extract the next token from the model output
             let next_token_tensor = outputs[0].to_array_view::<i64>()?;
             let next_token = next_token_tensor[[0, 0]];
 
@@ -103,10 +80,6 @@ pub fn create_tensor_and_run_model(max_tokens: u8, token_ids: Vec<i64>) -> Resul
             attention_mask.push(1);
             output_ids.push(next_token);
         }
-
-        //ic_cdk::println!("Final input_ids: {:?}", input_ids);
-        //ic_cdk::println!("Final attention_mask: {:?}", attention_mask);
-
         Ok(output_ids)
     })
 }
