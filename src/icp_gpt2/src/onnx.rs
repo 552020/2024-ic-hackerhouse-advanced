@@ -7,6 +7,9 @@ use crate::storage;
 use crate::MODEL_FILE;
 use anyhow::anyhow;
 
+use crate::setup_tokenizer;
+use crate::tokenizer;
+
 type Model = SimplePlan<TypedFact, Box<dyn TypedOp>, Graph<TypedFact, Box<dyn TypedOp>>>;
 
 thread_local! {
@@ -15,22 +18,14 @@ thread_local! {
 
 
 
-/// Constructs a runnable model from the serialized ONNX model.
 pub fn setup() -> TractResult<()> {
-    // Read the model bytes from the file.
     let bytes = storage::bytes(MODEL_FILE);
-
-    // Decode the model proto.
     let proto = tract_onnx::pb::ModelProto::decode(bytes)
         .map_err(|e| anyhow!("Failed to decode model proto: {}", e))?;
-
-    // Build the runnable model.
     let model = tract_onnx::onnx()
         .model_for_proto_model(&proto)?
         .into_optimized()?
         .into_runnable()?;
-
-    // Store the model in the thread-local storage.
     MODEL.with(|m| {
         *m.borrow_mut() = Some(model);
     });
@@ -46,6 +41,16 @@ fn setup_model() -> Result<(), String> {
 #[ic_cdk::update]
 fn model_inference(max_tokens: u8, numbers: Vec<i64>) -> Result<Vec<i64>, String> {
     create_tensor_and_run_model(max_tokens, numbers).map_err(|err| err.to_string())
+}
+
+#[ic_cdk::update]
+fn generate_text(input_prompt: String, token_limit: u8) -> Result<String, String> {
+    let encoded_tokens = tokenizer::encode(&input_prompt)
+        .map_err(|err| format!("Error encoding the prompt: {}", err))?;
+    let model_output_tokens = create_tensor_and_run_model(token_limit, encoded_tokens)
+        .map_err(|err| format!("Error executing the model: {}", err))?;
+    tokenizer::decode(&model_output_tokens)
+        .map_err(|err| format!("Error decoding the model output: {}", err))
 }
 
 
