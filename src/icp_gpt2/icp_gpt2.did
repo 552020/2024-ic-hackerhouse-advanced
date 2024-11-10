@@ -3,14 +3,19 @@ type ModelInferenceResult = variant {
     Err: text;
 };
 
+type TextGenerationResult = variant {
+    Ok: text;
+    Err: text;
+};
+
 
 service : {
-
+    "append_tokenizer_bytes": (vec nat8) -> ();
+    "setup_tokenizer": () -> (opt text);
     "model_inference": (nat8, vec int64) -> (ModelInferenceResult);
     "setup_model": () -> (opt text);
-
+    "generate_text": (text, nat8) -> (TextGenerationResult);
     "append_model_bytes": (vec nat8) -> ();
     "model_bytes_length": () -> (nat64) query;
     "clear_model_bytes": () -> ();
-
 }
