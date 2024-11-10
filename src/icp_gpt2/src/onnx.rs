@@ -30,6 +30,8 @@ pub fn setup() -> TractResult<()> {
         *m.borrow_mut() = Some(model);
     });
 
+	setup_tokenizer().ok_or_else(|| anyhow!("Failed to setup tokenizer"))?;
+
     Ok(())
 }
 
